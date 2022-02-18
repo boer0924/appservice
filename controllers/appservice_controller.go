@@ -19,8 +19,9 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	netv1 "k8s.io/api/networking/v1"
 	"reflect"
+
+	netv1 "k8s.io/api/networking/v1"
 
 	"github.com/boerlabs/resources"
 	"k8s.io/apimachinery/pkg/api/errors"
