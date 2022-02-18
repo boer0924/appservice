@@ -1,0 +1,16 @@
+domain: boer.xyz
+layout:
+- go.kubebuilder.io/v3
+projectName: appservice
+repo: github.com/boerlabs
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: boer.xyz
+  group: app
+  kind: AppService
+  path: github.com/boerlabs/api/v1beta1
+  version: v1beta1
+version: "3"

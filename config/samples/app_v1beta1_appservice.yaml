@@ -1,0 +1,46 @@
+apiVersion: app.boer.xyz/v1beta1
+kind: AppService
+metadata:
+  name: whoami
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  size: 3
+  image: cnych/whoami:latest
+  ports:
+    - port: 80
+      targetPort: 80
+  rules:
+    - http:
+        paths:
+          - pathType: Prefix
+            path: "/whoami"
+            backend:
+              service:
+                name: whoami
+                port:
+                  number: 80
+
+#---
+#spec:
+#  rules:
+#  - host: "foo.bar.com"
+#    http:
+#      paths:
+#        - pathType: Prefix
+#          path: "/bar"
+#          backend:
+#            service:
+#              name: service1
+#              port:
+#                number: 80
+#  - host: "*.foo.com"
+#    http:
+#      paths:
+#        - pathType: Prefix
+#          path: "/foo"
+#          backend:
+#            service:
+#              name: service2
+#              port:
+#                number: 80
