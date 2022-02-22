@@ -41,6 +41,9 @@ type AppServiceReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// +kubebuilder:rbac:groups="",resources=pods;services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=app.boer.xyz,resources=appservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=app.boer.xyz,resources=appservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=app.boer.xyz,resources=appservices/finalizers,verbs=update
