@@ -18,13 +18,11 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
-	"reflect"
 
 	netv1 "k8s.io/api/networking/v1"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/boerlabs/resources"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,114 +56,64 @@ type AppServiceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *AppServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("appservice", req.NamespacedName)
 
-	// TODO(user): your logic here
 	var appService appv1beta1.AppService
-	err := r.Get(ctx, req.NamespacedName, &appService)
-	if err != nil {
+	if err := r.Get(ctx, req.NamespacedName, &appService); err != nil {
 		// AppService被删除时忽略错误
-		if client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	logger.Info("fetch appservice objects", "appservice", appService)
+	// 已经获取到了 AppService 实例
+	// 创建/更新对应的 Deployment, Service 以及 Ingress 对象
+	// CreateOrUpdate
+	// 调谐：观察当前的状态和期望的状态进行对比
 
-	// 如果不存在，则创建关联资源
-	// 如果存在，判断是否需要更新
-	// 如果需要更新，则直接更新
-	// 如果不需要更新，则正常返回
-
-	deploy := &appsv1.Deployment{}
-	if err = r.Get(ctx, req.NamespacedName, deploy); err != nil && errors.IsNotFound(err) {
-		// 1、创建Deployment
-		deploy := resources.NewDeploy(&appService)
-		if err = r.Create(ctx, deploy); err != nil {
-			return ctrl.Result{}, err
-		}
-		// 2、创建Service
-		service := resources.NewService(&appService)
-		if err := r.Create(ctx, service); err != nil {
-			return ctrl.Result{}, err
-		}
-		// 3、创建Ingress
-		logger.Info("debug for ->", "rules", appService.Spec.Rules)
-		if appService.Spec.Rules != nil {
-			ingress := resources.NewIngress(&appService)
-			if err = r.Create(ctx, ingress); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		// 4、关联Annotations
-		data, _ := json.Marshal(appService.Spec)
-		if appService.Annotations != nil {
-			appService.Annotations["spec"] = string(data)
-		} else {
-			appService.Annotations = map[string]string{"spec": string(data)}
-		}
-
-		if err = r.Update(ctx, &appService); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	oldspec := appv1beta1.AppServiceSpec{}
-	if err := json.Unmarshal([]byte(appService.Annotations["spec"]), &oldspec); err != nil {
+	var deployment appsv1.Deployment
+	deployment.Name = appService.Name
+	deployment.Namespace = appService.Namespace
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		or, err := ctrl.CreateOrUpdate(ctx, r.Client, &deployment, func() error {
+			resources.NewDeployment(&appService, &deployment)
+			return ctrl.SetControllerReference(&appService, &deployment, r.Scheme)
+		})
+		logger.Info("CreateOrUpdate Result", "Deployment", or)
+		// logger.Error(err, "CreateOrUpdate Error", "errorString", err.Error())
+		return err
+	}); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// 当前规范与旧的对象不一致，则需要更新
-	if !reflect.DeepEqual(appService.Spec, oldspec) {
-		// 更新关联资源
-		newDeploy := resources.NewDeploy(&appService)
-		oldDeploy := &appsv1.Deployment{}
-		if err := r.Get(ctx, req.NamespacedName, oldDeploy); err != nil {
-			return ctrl.Result{}, err
-		}
-		oldDeploy.Spec = newDeploy.Spec
-		if err := r.Update(ctx, oldDeploy); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		newService := resources.NewService(&appService)
-		oldService := &corev1.Service{}
-		if err := r.Get(ctx, req.NamespacedName, oldService); err != nil {
-			return ctrl.Result{}, err
-		}
-		// 需要指定 ClusterIP 为之前的，不然更新会报错
-		newService.Spec.ClusterIP = oldService.Spec.ClusterIP
-		oldService.Spec = newService.Spec
-		if err := r.Update(ctx, oldService); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		newIngress := resources.NewIngress(&appService)
-		oldIngress := &netv1.Ingress{}
-		if err := r.Get(ctx, req.NamespacedName, oldIngress); err != nil {
-			// 因rules,omitempty策略，创建时无ingress, 更新时有ingress
-			if errors.IsNotFound(err) {
-				if appService.Spec.Rules != nil {
-					ingress := resources.NewIngress(&appService)
-					if err = r.Create(ctx, ingress); err != nil {
-						return ctrl.Result{}, err
-					}
-				}
-				return ctrl.Result{}, nil
-			}
-			return ctrl.Result{}, err
-		}
-		oldIngress.Spec = newIngress.Spec
-		if err := r.Update(ctx, oldIngress); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-
+	var service corev1.Service
+	service.Name = appService.Name
+	service.Namespace = appService.Namespace
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		or, _ := ctrl.CreateOrUpdate(ctx, r.Client, &service, func() error {
+			resources.NewService(&appService, &service)
+			return ctrl.SetControllerReference(&appService, &service, r.Scheme)
+		})
+		logger.Info("CreateOrUpdate Result", "Service", or)
+		// @TODO spec.clusterIP: Invalid value: \"\": field is immutable"
+		return nil
+	}); err != nil {
+		return ctrl.Result{}, err
 	}
+
+	var ingress netv1.Ingress
+	ingress.Name = appService.Name
+	ingress.Namespace = appService.Namespace
+	ingress.Annotations = appService.Annotations
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		or, err := ctrl.CreateOrUpdate(ctx, r.Client, &ingress, func() error {
+			resources.NewIngress(&appService, &ingress)
+			return ctrl.SetControllerReference(&appService, &ingress, r.Scheme)
+		})
+		logger.Info("CreateOrUpdate Result", "Ingress", or)
+		return err
+	}); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -173,5 +121,8 @@ func (r *AppServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *AppServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1beta1.AppService{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&netv1.Ingress{}).
 		Complete(r)
 }

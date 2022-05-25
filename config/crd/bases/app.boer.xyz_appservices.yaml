@@ -13,6 +13,9 @@ spec:
     kind: AppService
     listKind: AppServiceList
     plural: appservices
+    shortNames:
+    - asi
+    - asis
     singular: appservice
   scope: Namespaced
   versions:

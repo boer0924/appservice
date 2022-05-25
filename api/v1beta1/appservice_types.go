@@ -50,6 +50,7 @@ type AppServiceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=asi;asis
 
 // AppService is the Schema for the appservices API
 type AppService struct {

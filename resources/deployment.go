@@ -1,46 +1,30 @@
 package resources
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	appv1beta1 "github.com/boerlabs/api/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewDeploy(app *appv1beta1.AppService) *appsv1.Deployment {
+func NewDeployment(app *appv1beta1.AppService, deployment *appsv1.Deployment) {
 	labels := map[string]string{"app": app.Name}
 	selector := &metav1.LabelSelector{MatchLabels: labels}
-	return &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "Deployment",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      app.Name,
-			Namespace: app.Namespace,
-
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(app, schema.GroupVersionKind{
-					Group:   appv1beta1.GroupVersion.Group,
-					Version: appv1beta1.GroupVersion.Version,
-					Kind:    app.Kind,
-				}),
+	// deployment.ObjectMeta = metav1.ObjectMeta{
+	// 	Name:      app.Name,
+	// 	Namespace: app.Namespace,
+	// }
+	deployment.Spec = appsv1.DeploymentSpec{
+		Replicas: &app.Spec.Size,
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: labels,
+			},
+			Spec: corev1.PodSpec{
+				Containers: newContainer(app),
 			},
 		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &app.Spec.Size,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: newContainer(app),
-				},
-			},
-			Selector: selector,
-		},
+		Selector: selector,
 	}
 }
 

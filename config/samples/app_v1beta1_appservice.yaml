@@ -20,27 +20,3 @@ spec:
                 name: whoami
                 port:
                   number: 80
-
-#---
-#spec:
-#  rules:
-#  - host: "foo.bar.com"
-#    http:
-#      paths:
-#        - pathType: Prefix
-#          path: "/bar"
-#          backend:
-#            service:
-#              name: service1
-#              port:
-#                number: 80
-#  - host: "*.foo.com"
-#    http:
-#      paths:
-#        - pathType: Prefix
-#          path: "/foo"
-#          backend:
-#            service:
-#              name: service2
-#              port:
-#                number: 80
