@@ -3,10 +3,10 @@ kind: AppService
 metadata:
   name: whoami
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
 spec:
   size: 3
-  image: cnych/whoami:latest
+  image: traefik/whoami:latest
   ports:
     - port: 80
       targetPort: 80
@@ -14,7 +14,7 @@ spec:
     - http:
         paths:
           - pathType: Prefix
-            path: "/whoami"
+            path: "/whoami(/|$)(.*)"
             backend:
               service:
                 name: whoami

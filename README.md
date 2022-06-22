@@ -23,3 +23,6 @@ kubectl delete -f config/samples/
 make uninstall
 make undeploy
 ```
+
+- https://kubernetes.github.io/ingress-nginx/examples/rewrite/
+- https://github.com/kubernetes-sigs/application
