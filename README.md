@@ -1,11 +1,13 @@
 
 ```shell
-kubebuilder init --domain boer.xyz --repo github.com/boerlabs
+kubebuilder init --domain boer.xyz --repo github.com/boerlabs/appservice
 
 kubebuilder create api --group app --version v1beta1 --kind AppService
 
 make
 make manifests
+
+make generate
 
 make install
 
